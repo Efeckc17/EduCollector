@@ -3,23 +3,35 @@ import time
 import sqlite3
 import requests
 from bs4 import BeautifulSoup
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QTextEdit, QLabel, QComboBox, QMessageBox, QFileDialog, QMenuBar, QAction, QDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView, QPushButton, QGroupBox, QInputDialog
-from PyQt5.QtGui import QFont, QTextCursor, QPixmap, QPainter, QRegion
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QComboBox, QMessageBox, QFileDialog, QMenuBar, QAction, QDialog, QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView, QPushButton, QGroupBox, QInputDialog
+from PyQt5.QtGui import QFont, QTextCursor, QPixmap, QPainter, QRegion, QTextDocument
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QPropertyAnimation, QRect, QModelIndex
+from PyQt5.QtWidgets import QTextEdit
 
-class WriteTextEffect(QThread):
+class ZoomTxt(QTextEdit):
+    def wheelEvent(self, e):
+        if e.modifiers() & Qt.ControlModifier:
+            if e.angleDelta().y() > 0:
+                self.zoomIn(1)
+            else:
+                self.zoomOut(1)
+            e.accept()
+        else:
+            super().wheelEvent(e)
+
+class TxtEff(QThread):
     update_text = pyqtSignal(str)
-    def __init__(self, text, parent=None):
+    def __init__(self, txt, parent=None):
         super().__init__(parent)
-        self.text = text
+        self.txt = txt
     def run(self):
-        for line in self.text.split('\n'):
+        for line in self.txt.split('\n'):
             self.update_text.emit(line + "\n")
             time.sleep(0.05)
 
-class AnimatedButton(QPushButton):
-    def __init__(self, text):
-        super().__init__(text)
+class AniBtn(QPushButton):
+    def __init__(self, txt):
+        super().__init__(txt)
         self.setFont(QFont("Segoe UI", 10, QFont.Bold))
         self.setStyleSheet("""
             QPushButton {
@@ -34,34 +46,34 @@ class AnimatedButton(QPushButton):
             }
         """)
         self.default_geometry = None
-        self.animation = QPropertyAnimation(self, b"geometry")
-    def enterEvent(self, event):
+        self.anim = QPropertyAnimation(self, b"geometry")
+    def enterEvent(self, e):
         if self.default_geometry is None:
             self.default_geometry = self.geometry()
-        self.animation.stop()
-        rect = self.default_geometry
-        self.animation.setStartValue(rect)
-        self.animation.setEndValue(QRect(rect.x() - 3, rect.y() - 3, rect.width() + 6, rect.height() + 6))
-        self.animation.setDuration(150)
-        self.animation.start()
-        super().enterEvent(event)
-    def leaveEvent(self, event):
-        self.animation.stop()
-        rect = self.default_geometry
-        self.animation.setStartValue(self.geometry())
-        self.animation.setEndValue(rect)
-        self.animation.setDuration(150)
-        self.animation.start()
-        super().leaveEvent(event)
+        self.anim.stop()
+        r = self.default_geometry
+        self.anim.setStartValue(r)
+        self.anim.setEndValue(QRect(r.x() - 3, r.y() - 3, r.width() + 6, r.height() + 6))
+        self.anim.setDuration(150)
+        self.anim.start()
+        super().enterEvent(e)
+    def leaveEvent(self, e):
+        self.anim.stop()
+        r = self.default_geometry
+        self.anim.setStartValue(self.geometry())
+        self.anim.setEndValue(r)
+        self.anim.setDuration(150)
+        self.anim.start()
+        super().leaveEvent(e)
 
-class HistoryDialog(QDialog):
+class HistDlg(QDialog):
     searchSelected = pyqtSignal(str)
-    def __init__(self, db_path, parent=None):
+    def __init__(self, db, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Search History")
         self.setGeometry(300, 200, 600, 400)
-        self.db_path = db_path
-        layout = QVBoxLayout(self)
+        self.db = db
+        lay = QVBoxLayout(self)
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["ID", "Topic", "Timestamp"])
@@ -69,11 +81,11 @@ class HistoryDialog(QDialog):
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.table.doubleClicked.connect(self.on_double_click)
-        layout.addWidget(self.table)
-        self.load_history()
-    def load_history(self):
-        conn = sqlite3.connect(self.db_path)
+        self.table.doubleClicked.connect(self.on_dbl)
+        lay.addWidget(self.table)
+        self.load()
+    def load(self):
+        conn = sqlite3.connect(self.db)
         c = conn.cursor()
         c.execute("SELECT id, topic, created_at FROM history ORDER BY created_at DESC")
         rows = c.fetchall()
@@ -84,22 +96,22 @@ class HistoryDialog(QDialog):
             self.table.setItem(i, 0, QTableWidgetItem(str(row[0])))
             self.table.setItem(i, 1, QTableWidgetItem(row[1]))
             self.table.setItem(i, 2, QTableWidgetItem(row[2]))
-    def on_double_click(self, index: QModelIndex):
-        row = index.row()
-        topic_item = self.table.item(row, 1)
-        if topic_item:
-            self.searchSelected.emit(topic_item.text())
+    def on_dbl(self, idx: QModelIndex):
+        r = idx.row()
+        t = self.table.item(r, 1)
+        if t:
+            self.searchSelected.emit(t.text())
             self.close()
 
-class EduCollectorApp(QMainWindow):
+class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("EduCollector 1.1")
         self.setGeometry(100, 100, 1200, 700)
-        self.db_path = "educollector.db"
-        self.init_database()
-        self.user_data = self.load_user_data()
-        self.languages = {
+        self.db = "educollector.db"
+        self.db_init()
+        self.user = self.load_data()
+        self.langs = {
             "English": {
                 "code": "en",
                 "wiki_url": "https://en.wikipedia.org/wiki/",
@@ -156,17 +168,17 @@ class EduCollectorApp(QMainWindow):
                 }
             }
         }
-        self.blocked_keywords = {
+        self.blocked = {
             "en": ["racism", "hate", "violence", "discrimination", "homophobia"],
             "tr": ["ırkçılık", "nefret", "şiddet", "ayrımcılık", "homofobi"],
             "fr": ["racisme", "haine", "violence", "discrimination", "homophobie"],
             "de": ["rassismus", "hass", "gewalt", "diskriminierung", "homophobie"],
             "ar": ["العنصرية", "كراهية", "عنف", "تمييز", "رهاب المثلية"]
         }
-        self.current_language = self.user_data['default_language'] if self.user_data['default_language'] in self.languages else "English"
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
-        self.main_layout = QHBoxLayout(self.central_widget)
+        self.cur_lang = self.user['default_language'] if self.user['default_language'] in self.langs else "English"
+        self.cw = QWidget()
+        self.setCentralWidget(self.cw)
+        self.ml = QHBoxLayout(self.cw)
         self.setStyleSheet("""
             QMainWindow {
                 background-color: qlineargradient(spread:pad, x1:0, y1:0, x2:1, y2:1, stop:0 #121212, stop:1 #1b1b1b);
@@ -213,55 +225,55 @@ class EduCollectorApp(QMainWindow):
                 background-color: #512da8;
             }
         """)
-        self.create_menubar()
-        self.profile_widget = self.create_profile_box()
-        self.main_layout.addWidget(self.profile_widget, stretch=0)
-        self.content_widget = QWidget()
-        self.content_layout = QVBoxLayout(self.content_widget)
-        self.content_layout.setContentsMargins(20, 20, 20, 20)
-        self.content_layout.setSpacing(15)
-        self.title_label = QLabel("EduCollector 1.1")
-        self.title_label.setFont(QFont("Segoe UI", 24, QFont.Bold))
-        self.title_label.setAlignment(Qt.AlignCenter)
-        self.content_layout.addWidget(self.title_label)
-        lang_layout = QHBoxLayout()
-        self.language_label = QLabel("Select Language:")
-        self.language_label.setFont(QFont("Segoe UI", 11))
-        self.language_selector = QComboBox()
-        self.language_selector.setFont(QFont("Segoe UI", 10))
-        self.language_selector.addItems(self.languages.keys())
-        self.language_selector.setCurrentText(self.current_language)
-        self.language_selector.currentIndexChanged.connect(self.update_language)
-        lang_layout.addWidget(self.language_label)
-        lang_layout.addWidget(self.language_selector)
-        self.content_layout.addLayout(lang_layout)
-        self.topic_label = QLabel("Enter a topic to search:")
-        self.topic_label.setFont(QFont("Segoe UI", 12, QFont.Bold))
-        self.content_layout.addWidget(self.topic_label)
-        self.topic_input = QLineEdit()
-        self.topic_input.setFont(QFont("Segoe UI", 10))
-        self.topic_input.setPlaceholderText("Type your topic here...")
-        self.content_layout.addWidget(self.topic_input)
-        btn_layout = QHBoxLayout()
-        self.search_button = AnimatedButton("Search")
-        self.search_button.clicked.connect(self.search_topic)
-        self.save_button = AnimatedButton("Save Result")
-        self.save_button.clicked.connect(self.save_result)
-        self.exit_button = AnimatedButton("Exit")
-        self.exit_button.clicked.connect(self.close)
-        btn_layout.addWidget(self.search_button)
-        btn_layout.addWidget(self.save_button)
-        btn_layout.addWidget(self.exit_button)
-        self.content_layout.addLayout(btn_layout)
-        self.result_area = QTextEdit()
-        self.result_area.setFont(QFont("Segoe UI", 10))
-        self.result_area.setReadOnly(True)
-        self.content_layout.addWidget(self.result_area)
-        self.main_layout.addWidget(self.content_widget, stretch=2)
-        self.update_language_labels()
+        self.mk_menu()
+        self.pw = self.mk_profile_box()
+        self.ml.addWidget(self.pw, stretch=0)
+        self.cnt_w = QWidget()
+        self.cnt_l = QVBoxLayout(self.cnt_w)
+        self.cnt_l.setContentsMargins(20, 20, 20, 20)
+        self.cnt_l.setSpacing(15)
+        self.title_lbl = QLabel("EduCollector 1.1")
+        self.title_lbl.setFont(QFont("Segoe UI", 24, QFont.Bold))
+        self.title_lbl.setAlignment(Qt.AlignCenter)
+        self.cnt_l.addWidget(self.title_lbl)
+        hl = QHBoxLayout()
+        self.lang_lbl = QLabel("Select Language:")
+        self.lang_lbl.setFont(QFont("Segoe UI", 11))
+        self.lang_sel = QComboBox()
+        self.lang_sel.setFont(QFont("Segoe UI", 10))
+        self.lang_sel.addItems(self.langs.keys())
+        self.lang_sel.setCurrentText(self.cur_lang)
+        self.lang_sel.currentIndexChanged.connect(self.upd_lang)
+        hl.addWidget(self.lang_lbl)
+        hl.addWidget(self.lang_sel)
+        self.cnt_l.addLayout(hl)
+        self.topic_lbl = QLabel("Enter a topic to search:")
+        self.topic_lbl.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        self.cnt_l.addWidget(self.topic_lbl)
+        self.topic_inp = QLineEdit()
+        self.topic_inp.setFont(QFont("Segoe UI", 10))
+        self.topic_inp.setPlaceholderText("Type your topic here...")
+        self.cnt_l.addWidget(self.topic_inp)
+        hbl = QHBoxLayout()
+        self.search_btn = AniBtn("Search")
+        self.search_btn.clicked.connect(self.search)
+        self.save_btn = AniBtn("Save Result")
+        self.save_btn.clicked.connect(self.save_res)
+        self.exit_btn = AniBtn("Exit")
+        self.exit_btn.clicked.connect(self.close)
+        hbl.addWidget(self.search_btn)
+        hbl.addWidget(self.save_btn)
+        hbl.addWidget(self.exit_btn)
+        self.cnt_l.addLayout(hbl)
+        self.result = ZoomTxt()
+        self.result.setFont(QFont("Segoe UI", 10))
+        self.result.setReadOnly(True)
+        self.cnt_l.addWidget(self.result)
+        self.ml.addWidget(self.cnt_w, stretch=2)
+        self.upd_lbl()
 
-    def init_database(self):
-        conn = sqlite3.connect(self.db_path)
+    def db_init(self):
+        conn = sqlite3.connect(self.db)
         c = conn.cursor()
         c.execute("CREATE TABLE IF NOT EXISTS user (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT DEFAULT 'User', profile_img TEXT, default_language TEXT DEFAULT 'English')")
         c.execute("CREATE TABLE IF NOT EXISTS history (id INTEGER PRIMARY KEY AUTOINCREMENT, topic TEXT, language TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)")
@@ -271,8 +283,8 @@ class EduCollectorApp(QMainWindow):
             conn.commit()
         conn.close()
 
-    def load_user_data(self):
-        conn = sqlite3.connect(self.db_path)
+    def load_data(self):
+        conn = sqlite3.connect(self.db)
         c = conn.cursor()
         c.execute("SELECT id, name, profile_img, default_language FROM user LIMIT 1")
         row = c.fetchone()
@@ -281,195 +293,195 @@ class EduCollectorApp(QMainWindow):
             return {"id": row[0], "name": row[1], "profile_img": row[2] or "", "default_language": row[3] or "English"}
         return {"id": None, "name": "User", "profile_img": "", "default_language": "English"}
 
-    def record_search(self, topic):
-        conn = sqlite3.connect(self.db_path)
+    def rec_search(self, t):
+        conn = sqlite3.connect(self.db)
         c = conn.cursor()
-        lang_code = self.languages[self.current_language]["code"]
-        c.execute("INSERT INTO history (topic, language) VALUES (?, ?)", (topic, lang_code))
+        lc = self.langs[self.cur_lang]["code"]
+        c.execute("INSERT INTO history (topic, language) VALUES (?, ?)", (t, lc))
         conn.commit()
         conn.close()
 
-    def create_profile_box(self):
-        box = QGroupBox("Profile")
-        box.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        box_lay = QVBoxLayout()
-        box_lay.setContentsMargins(10, 10, 10, 10)
-        box_lay.setSpacing(10)
-        self.profile_pic_label = QLabel()
-        self.profile_pic_label.setAlignment(Qt.AlignCenter)
-        self.profile_pic_label.setFixedSize(60, 60)
-        self.update_profile_picture()
-        self.user_name_label = QLabel(self.user_data['name'])
-        self.user_name_label.setFont(QFont("Segoe UI", 10, QFont.Bold))
-        self.user_name_label.setAlignment(Qt.AlignCenter)
-        self.change_pic_button = AnimatedButton("Change Picture")
-        self.change_pic_button.setFont(QFont("Segoe UI", 9))
-        self.change_pic_button.clicked.connect(self.change_profile_picture)
-        self.change_name_button = AnimatedButton("Change Name")
-        self.change_name_button.setFont(QFont("Segoe UI", 9))
-        self.change_name_button.clicked.connect(self.change_user_name)
-        box_lay.addWidget(self.profile_pic_label, alignment=Qt.AlignCenter)
-        box_lay.addWidget(self.user_name_label, alignment=Qt.AlignCenter)
-        box_lay.addWidget(self.change_pic_button)
-        box_lay.addWidget(self.change_name_button)
-        box_lay.addStretch(1)
-        box.setLayout(box_lay)
-        return box
+    def mk_profile_box(self):
+        b = QGroupBox("Profile")
+        b.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        bl = QVBoxLayout()
+        bl.setContentsMargins(10, 10, 10, 10)
+        bl.setSpacing(10)
+        self.profile_pic = QLabel()
+        self.profile_pic.setAlignment(Qt.AlignCenter)
+        self.profile_pic.setFixedSize(60, 60)
+        self.upd_pic()
+        self.user_lbl = QLabel(self.user['name'])
+        self.user_lbl.setFont(QFont("Segoe UI", 10, QFont.Bold))
+        self.user_lbl.setAlignment(Qt.AlignCenter)
+        self.chg_pic_btn = AniBtn("Change Picture")
+        self.chg_pic_btn.setFont(QFont("Segoe UI", 9))
+        self.chg_pic_btn.clicked.connect(self.chg_pic)
+        self.chg_name_btn = AniBtn("Change Name")
+        self.chg_name_btn.setFont(QFont("Segoe UI", 9))
+        self.chg_name_btn.clicked.connect(self.chg_name)
+        self.hist_btn = AniBtn("History")
+        self.hist_btn.setFont(QFont("Segoe UI", 9))
+        self.hist_btn.clicked.connect(self.hist)
+        bl.addWidget(self.profile_pic, alignment=Qt.AlignCenter)
+        bl.addWidget(self.user_lbl, alignment=Qt.AlignCenter)
+        bl.addWidget(self.chg_pic_btn)
+        bl.addWidget(self.chg_name_btn)
+        bl.addWidget(self.hist_btn)
+        bl.addStretch(1)
+        b.setLayout(bl)
+        return b
 
-    def update_profile_picture(self):
-        size = 60
-        if self.user_data['profile_img']:
-            pix = QPixmap(self.user_data['profile_img'])
-            if pix.isNull():
-                pix = QPixmap(size, size)
-                pix.fill(Qt.gray)
+    def upd_pic(self):
+        s = 60
+        if self.user['profile_img']:
+            p = QPixmap(self.user['profile_img'])
+            if p.isNull():
+                p = QPixmap(s, s)
+                p.fill(Qt.gray)
             else:
-                pix = pix.scaled(size, size, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+                p = p.scaled(s, s, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
         else:
-            pix = QPixmap(size, size)
-            pix.fill(Qt.gray)
-        final_pix = QPixmap(size, size)
-        final_pix.fill(Qt.transparent)
-        p = QPainter(final_pix)
-        p.setRenderHint(QPainter.Antialiasing)
-        p.setClipRegion(QRegion(0, 0, size, size, QRegion.Ellipse))
-        p.drawPixmap(0, 0, pix)
-        p.end()
-        self.profile_pic_label.setPixmap(final_pix)
+            p = QPixmap(s, s)
+            p.fill(Qt.gray)
+        f = QPixmap(s, s)
+        f.fill(Qt.transparent)
+        painter = QPainter(f)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setClipRegion(QRegion(0, 0, s, s, QRegion.Ellipse))
+        painter.drawPixmap(0, 0, p)
+        painter.end()
+        self.profile_pic.setPixmap(f)
 
-    def change_profile_picture(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Select Profile Picture", "", "Images (*.png *.jpg *.jpeg *.bmp)")
-        if file_path:
-            conn = sqlite3.connect(self.db_path)
+    def chg_pic(self):
+        fp, _ = QFileDialog.getOpenFileName(self, "Select Profile Picture", "", "Images (*.png *.jpg *.jpeg *.bmp)")
+        if fp:
+            conn = sqlite3.connect(self.db)
             c = conn.cursor()
-            c.execute("UPDATE user SET profile_img=? WHERE id=?", (file_path, self.user_data['id']))
+            c.execute("UPDATE user SET profile_img=? WHERE id=?", (fp, self.user['id']))
             conn.commit()
             conn.close()
-            self.user_data['profile_img'] = file_path
-            self.update_profile_picture()
+            self.user['profile_img'] = fp
+            self.upd_pic()
 
-    def change_user_name(self):
-        new_name, ok = QInputDialog.getText(self, "Change User Name", "Enter new user name:", text=self.user_data['name'])
+    def chg_name(self):
+        new_name, ok = QInputDialog.getText(self, "Change User Name", "Enter new user name:", text=self.user['name'])
         if ok and new_name.strip():
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db)
             c = conn.cursor()
-            c.execute("UPDATE user SET name=? WHERE id=?", (new_name.strip(), self.user_data['id']))
+            c.execute("UPDATE user SET name=? WHERE id=?", (new_name.strip(), self.user['id']))
             conn.commit()
             conn.close()
-            self.user_data['name'] = new_name.strip()
-            self.user_name_label.setText(new_name.strip())
+            self.user['name'] = new_name.strip()
+            self.user_lbl.setText(new_name.strip())
 
-    def create_menubar(self):
-        menubar = self.menuBar()
-        file_menu = menubar.addMenu("File")
-        new_search_action = QAction("New Search", self)
-        new_search_action.setShortcut("Ctrl+N")
-        new_search_action.triggered.connect(self.new_search)
-        file_menu.addAction(new_search_action)
-        save_action = QAction("Save Result", self)
-        save_action.setShortcut("Ctrl+S")
-        save_action.triggered.connect(self.save_result)
-        file_menu.addAction(save_action)
-        file_menu.addSeparator()
-        exit_action = QAction("Exit", self)
-        exit_action.setShortcut("Ctrl+Q")
-        exit_action.triggered.connect(self.close)
-        file_menu.addAction(exit_action)
-        tools_menu = menubar.addMenu("Tools")
-        history_action = QAction("History", self)
-        history_action.triggered.connect(self.show_history)
-        tools_menu.addAction(history_action)
-        help_menu = menubar.addMenu("Help")
-        about_action = QAction("About EduCollector", self)
-        about_action.triggered.connect(self.about_app)
-        help_menu.addAction(about_action)
+    def mk_menu(self):
+        mb = self.menuBar()
+        fmenu = mb.addMenu("File")
+        ns = QAction("New Search", self)
+        ns.setShortcut("Ctrl+N")
+        ns.triggered.connect(self.new_search)
+        fmenu.addAction(ns)
+        sv = QAction("Save Result", self)
+        sv.setShortcut("Ctrl+S")
+        sv.triggered.connect(self.save_res)
+        fmenu.addAction(sv)
+        fmenu.addSeparator()
+        ex = QAction("Exit", self)
+        ex.setShortcut("Ctrl+Q")
+        ex.triggered.connect(self.close)
+        fmenu.addAction(ex)
+        help_menu = mb.addMenu("Help")
+        ab = QAction("About EduCollector", self)
+        ab.triggered.connect(self.about)
+        help_menu.addAction(ab)
 
     def new_search(self):
-        self.topic_input.clear()
-        self.result_area.clear()
+        self.topic_inp.clear()
+        self.result.clear()
 
-    def save_result(self):
-        if not self.result_area.toPlainText():
+    def save_res(self):
+        if not self.result.toPlainText():
             QMessageBox.warning(self, "Error", "No content to save!")
             return
-        file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Text Files (*.txt);;All Files (*)")
-        if file_path:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(self.result_area.toPlainText())
+        fp, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Text Files (*.txt);;All Files (*)")
+        if fp:
+            with open(fp, 'w', encoding='utf-8') as f:
+                f.write(self.result.toPlainText())
             QMessageBox.information(self, "Saved", "File saved successfully!")
 
-    def show_history(self):
-        dlg = HistoryDialog(self.db_path, self)
-        dlg.searchSelected.connect(self.on_history_search_selected)
+    def hist(self):
+        dlg = HistDlg(self.db, self)
+        dlg.searchSelected.connect(self.hist_sel)
         dlg.exec_()
 
-    def on_history_search_selected(self, topic):
-        self.topic_input.setText(topic)
-        self.search_topic()
+    def hist_sel(self, t):
+        self.topic_inp.setText(t)
+        self.search()
 
-    def about_app(self):
+    def about(self):
         QMessageBox.information(self, "About EduCollector", "For help: toxi360@workmail.com")
 
-    def update_language(self):
-        self.current_language = self.language_selector.currentText()
-        conn = sqlite3.connect(self.db_path)
+    def upd_lang(self):
+        self.cur_lang = self.lang_sel.currentText()
+        conn = sqlite3.connect(self.db)
         c = conn.cursor()
-        c.execute("UPDATE user SET default_language=? WHERE id=?", (self.current_language, self.user_data['id']))
+        c.execute("UPDATE user SET default_language=? WHERE id=?", (self.cur_lang, self.user['id']))
         conn.commit()
         conn.close()
-        self.update_language_labels()
+        self.upd_lbl()
 
-    def update_language_labels(self):
-        labels = self.languages[self.current_language]["labels"]
-        self.language_label.setText(labels["language_label"])
-        self.topic_label.setText(labels["topic_label"])
-        self.search_button.setText(labels["search_button"])
-        self.save_button.setText(labels["save_button"])
-        self.exit_button.setText(labels["exit_button"])
+    def upd_lbl(self):
+        lbls = self.langs[self.cur_lang]["labels"]
+        self.lang_lbl.setText(lbls["language_label"])
+        self.topic_lbl.setText(lbls["topic_label"])
+        self.search_btn.setText(lbls["search_button"])
+        self.save_btn.setText(lbls["save_button"])
+        self.exit_btn.setText(lbls["exit_button"])
 
-    def search_topic(self):
-        topic = self.topic_input.text().strip()
-        if not topic:
+    def search(self):
+        t = self.topic_inp.text().strip()
+        if not t:
             QMessageBox.warning(self, "Warning", "Please enter a topic to search!")
             return
-        lang_code = self.languages[self.current_language]["code"]
-        current_keywords = self.blocked_keywords.get(lang_code, [])
-        for keyword in current_keywords:
-            if keyword.lower() in topic.lower():
+        lc = self.langs[self.cur_lang]["code"]
+        cur_b = self.blocked.get(lc, [])
+        for k in cur_b:
+            if k.lower() in t.lower():
                 QMessageBox.warning(self, "Blocked", "This topic contains prohibited keywords.")
                 return
-        self.record_search(topic)
-        wiki_url = self.languages[self.current_language]["wiki_url"]
-        url = wiki_url + topic.replace(" ", "_")
+        self.rec_search(t)
+        w = self.langs[self.cur_lang]["wiki_url"]
+        url = w + t.replace(" ", "_")
         try:
             r = requests.get(url)
             if r.status_code == 200:
                 s = BeautifulSoup(r.text, 'html.parser')
-                t = s.find('h1').text
-                p = s.find_all('p')
-                result = f"<h1 style='font-size:16pt; font-weight:bold;'>{t}</h1>\n\n"
-                for para in p[:200]:
-                    x = para.get_text(strip=True)
+                head = s.find('h1').text
+                pars = s.find_all('p')
+                res = f"<h1 style='font-size:16pt; font-weight:bold;'>{head}</h1>\n\n"
+                for par in pars[:200]:
+                    x = par.get_text(strip=True)
                     if x:
-                        result += f"{x}\n\n"
-                self.result_area.clear()
-                self.writer = WriteTextEffect(result)
-                self.writer.update_text.connect(self.append_text)
-                self.writer.start()
+                        res += f"{x}\n\n"
+                self.result.clear()
+                self.twriter = TxtEff(res)
+                self.twriter.update_text.connect(self.append_txt)
+                self.twriter.start()
             else:
-                self.result_area.setText(f"No results found for '{topic}' in {self.current_language}.")
+                self.result.setText(f"No results found for '{t}' in {self.cur_lang}.")
         except Exception as e:
-            self.result_area.setText(f"Error fetching data: {str(e)}")
+            self.result.setText(f"Error fetching data: {str(e)}")
 
-    def append_text(self, line):
-        self.result_area.moveCursor(QTextCursor.End)
-        self.result_area.insertPlainText(line)
+    def append_txt(self, line):
+        self.result.moveCursor(QTextCursor.End)
+        self.result.insertPlainText(line)
 
-    def closeEvent(self, event):
-        event.accept()
+    def closeEvent(self, e):
+        e.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    w = EduCollectorApp()
+    w = MainApp()
     w.show()
     sys.exit(app.exec_())
