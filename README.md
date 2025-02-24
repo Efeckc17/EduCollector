@@ -12,7 +12,7 @@ EduCollector is a PyQt-based desktop application that allows users to fetch, rea
 - ✨ **Smooth UI** with animations and a responsive design
 - 👤 **User profile system**: Customize your name and profile picture
 - 🕒 **Search History**: Quickly revisit past topics
-- ➕ **Zoom in/out**: zoom-in/out feature for result area  
+- ➕ **Zoom in/out**: zoom-in/out feature for result area (Use the CTRL key and mouse wheel to zoom in and out.)
 ## Install / start 
    ```bash
    git clone https://github.com/Efeckc17/EduCollector.git
