@@ -29,8 +29,8 @@ jobs:
 
       - name: Build Windows App
         run: |
-          pyinstaller --noconfirm --onefile --windowed --name EduCollector ^
-            --add-data "src/themes;themes" ^
+          pyinstaller --noconfirm --onefile --windowed --name EduCollector `
+            --add-data "src/themes;themes" `
             src/main.py
 
       - name: Upload to GitHub Releases

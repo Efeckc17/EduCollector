@@ -65,9 +65,9 @@ jobs:
 
       - name: Create AppImage
         run: |
-          curl -L https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
-          chmod +x appimagetool
-          ./appimagetool AppDir
+          wget -c "https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage AppDir
           mkdir -p dist
           mv EduCollector-x86_64.AppImage dist/
 
