@@ -1,0 +1,79 @@
+name: Build and Release Linux App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libxcb-keysyms1 \
+            libxcb-render-util0 \
+            libxkbcommon-x11-0 \
+            libxcb-xinerama0 \
+            libxcb-image0 \
+            libxcb-xkb1 \
+            libxcb-shape0 \
+            libxcb-icccm4 \
+            appstream \
+            libfuse2
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Linux App
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name EduCollector \
+            --add-data "src/themes:themes" \
+            src/main.py
+
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+
+          cp dist/EduCollector AppDir/usr/bin/EduCollector
+
+          echo "[Desktop Entry]" > AppDir/EduCollector.desktop
+          echo "Name=EduCollector" >> AppDir/EduCollector.desktop
+          echo "Exec=EduCollector" >> AppDir/EduCollector.desktop
+          echo "Type=Application" >> AppDir/EduCollector.desktop
+          echo "Categories=Education;Science;" >> AppDir/EduCollector.desktop
+          echo "Comment=Educational article collector" >> AppDir/EduCollector.desktop
+
+          echo '#!/bin/sh' > AppDir/AppRun
+          echo 'exec "$APPDIR/usr/bin/EduCollector" "$@"' >> AppDir/AppRun
+          chmod +x AppDir/AppRun
+
+      - name: Create AppImage
+        run: |
+          curl -L https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
+          chmod +x appimagetool
+          ./appimagetool AppDir
+          mkdir -p dist
+          mv EduCollector-x86_64.AppImage dist/
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: 'dist/EduCollector-x86_64.AppImage'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

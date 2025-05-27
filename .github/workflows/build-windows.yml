@@ -1,0 +1,41 @@
+name: Build and Release Windows App
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Windows App
+        run: |
+          pyinstaller --noconfirm --onefile --windowed --name EduCollector ^
+            --add-data "src/themes;themes" ^
+            src/main.py
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: 'dist/EduCollector.exe'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
