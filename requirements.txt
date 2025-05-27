@@ -1,5 +1,5 @@
-
-PyQt5
+PySide6>=6.5.0
 requests
 beautifulsoup4
+appdirs
 #sqlite3#

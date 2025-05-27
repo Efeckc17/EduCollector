@@ -1,9 +1,9 @@
 import sqlite3
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView
-from PyQt5.QtCore import QModelIndex, pyqtSignal
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QAbstractItemView, QHeaderView
+from PySide6.QtCore import QModelIndex, Signal
 
 class HistDlg(QDialog):
-    searchSelected = pyqtSignal(str)
+    searchSelected = Signal(str)
     def __init__(self, db, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Search History")
@@ -40,7 +40,7 @@ class HistDlg(QDialog):
             self.close()
 
 class OfflineDlg(QDialog):
-    articleSelected = pyqtSignal(dict)
+    articleSelected = Signal(dict)
     def __init__(self, db, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Offline Makaleler")

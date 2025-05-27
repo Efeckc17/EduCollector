@@ -1,8 +1,8 @@
-# 📚 EduCollector 1.2
+##  📚 EduCollector
 
-![EduCollector Logo](EduCollector.png)
+![EduCollector Screen](img/screenshot.png)
 
-**EduCollector** is a powerful and elegant desktop application built with **Python + PyQt5** that allows you to **search, read, and save Wikipedia articles** in multiple languages.  
+**EduCollector** is a powerful and elegant desktop application built with **Python + PySide6** that allows you to **search, read, and save Wikipedia articles** in multiple languages.  
 It is designed to make your research easier and your knowledge collection more organized — all in a clean and modern interface.
 
 ---
@@ -18,13 +18,13 @@ It is designed to make your research easier and your knowledge collection more o
 - 💾 **Save results**  
   Save the fetched article content to a `.txt` file for offline reading.
 
-- 📝 **Offline articles viewer** *(New in v1.2)*  
+- 📝 **Offline articles viewer** *(New in v0.1)*  
   All your saved articles are stored locally and can be accessed anytime without an internet connection.
 
-- 📋 **Copy to clipboard** *(New in v1.2)*  
+- 📋 **Copy to clipboard** *(New in v0.1)*  
   Copy the entire article content with one click.
 
-- 🔗 **Open article link** *(New in v1.2)*  
+- 🔗 **Open article link** *(New in v0.1)*  
   Quickly open the original Wikipedia page of the article.
 
 - 🕒 **Search History**  
@@ -33,14 +33,17 @@ It is designed to make your research easier and your knowledge collection more o
 - 👤 **User Profile System**  
   Customize your **profile picture** and **username**. Your language preference is saved automatically.
 
-- 🛡️ **Content Filtering**  
-  Blocks prohibited keywords to ensure a safe and productive research environment.
-
 - 🔎 **Zoom in/out support**  
   Use **CTRL + Mouse Wheel** to zoom in and out on article content.
 
 - 🌟 **Clean and Animated UI**  
   Smooth button animations and a well-structured, distraction-free interface.
+
+- 🌙 **Dark Theme** *(New in v0.1)*  
+  Modern dark theme for comfortable reading in low-light conditions.
+
+- 💾 **Platform Independent Data Storage** *(New in v0.1)*  
+  User data and articles are stored in platform-specific application data directories.
 
 ---
 
@@ -69,15 +72,19 @@ python main.py
 
 ```
 EduCollector/
-├── EduCollector.png         # App logo
-├── requirements.txt         # Python dependencies
-├── README.md                # This file
+├── requirements.txt         
+├── LICENSE                  
+├── README.md             
 └── src/
-    ├── app.py               # Main application logic
-    ├── database.py          # Database operations
-    ├── dialogs.py           # Dialog windows (History & Offline articles)
-    ├── widgets.py           # Custom PyQt Widgets & Animations
-    └── main.py              # Application entry point
+    ├── app.py              
+    ├── database.py         
+    ├── dialogs.py          
+    ├── widgets.py          
+    ├── main.py             
+    ├── version.py          
+    ├── licenses.py          
+    └── themes/
+        └── dark.qss        
 ```
 
 ---
@@ -100,8 +107,6 @@ For help or collaboration:
 
 ## 📝 License
 
-This project is open-source and licensed under the **MIT License**.
+This project is open-source and licensed under the **GNU General Public License v3.0 (GPL-3.0)**.
 
----
 
-## ✪️ If you like this project, give it a star on GitHub!

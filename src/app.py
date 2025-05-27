@@ -1,19 +1,28 @@
 import sys, requests
-from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QComboBox, QMessageBox, QFileDialog, QMenuBar, QAction, QInputDialog, QApplication
-from PyQt5.QtGui import QFont, QPixmap, QPainter, QRegion, QTextCursor, QDesktopServices
-from PyQt5.QtCore import Qt, QUrl
+import os
+from PySide6.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLineEdit, QLabel, QComboBox, QMessageBox, QFileDialog, QMenuBar, QInputDialog, QApplication, QGroupBox
+from PySide6.QtGui import QFont, QPixmap, QPainter, QRegion, QTextCursor, QDesktopServices, QAction
+from PySide6.QtCore import Qt, QUrl
 from bs4 import BeautifulSoup
 from dialogs import HistDlg, OfflineDlg
 from widgets import ZoomTxt, TxtEff, AniBtn
 import sqlite3
 from database import init_db, load_user, record_search, save_article
+from version import VERSION
+from appdirs import user_data_dir
+from licenses import show_educollector_license, show_pyside6_license
 
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("EduCollector 1.2")
+        self.setWindowTitle(f"EduCollector {VERSION}")
         self.setGeometry(100,100,1200,700)
-        self.db = "educollector.db"
+        
+        
+        self.db_dir = user_data_dir("EduCollector", appauthor=False)
+        os.makedirs(self.db_dir, exist_ok=True)
+        self.db = os.path.join(self.db_dir, "educollector.db")
+        
         init_db(self.db)
         self.user = load_user(self.db)
         self.langs = {
@@ -22,13 +31,6 @@ class MainApp(QMainWindow):
             "Français": {"code": "fr", "wiki_url": "https://fr.wikipedia.org/wiki/", "labels": {"language_label": "Choisir la langue:", "topic_label": "Entrez un sujet à rechercher:", "search_button": "Rechercher", "save_button": "Enregistrer le résultat", "copy_button": "Copier", "link_button": "Lien de l'article", "exit_button": "Quitter", "offline_button": "Article Hors Ligne", "profile_title": "Profil", "chg_pic": "Changer d'image", "chg_name": "Changer de nom", "history": "Historique"}},
             "Deutsch": {"code": "de", "wiki_url": "https://de.wikipedia.org/wiki/", "labels": {"language_label": "Sprache auswählen:", "topic_label": "Geben Sie ein Thema zur Suche ein:", "search_button": "Suchen", "save_button": "Ergebnis speichern", "copy_button": "Kopieren", "link_button": "Artikellink", "exit_button": "Beenden", "offline_button": "Offline Artikel", "profile_title": "Profil", "chg_pic": "Bild ändern", "chg_name": "Namen ändern", "history": "Verlauf"}},
             "العربية": {"code": "ar", "wiki_url": "https://ar.wikipedia.org/wiki/", "labels": {"language_label": "اختر اللغة:", "topic_label": "أدخل موضوعًا للبحث:", "search_button": "بحث", "save_button": "احفظ النتيجة", "copy_button": "نسخ", "link_button": "رابط المقال", "exit_button": "خروج", "offline_button": "مقالات دون اتصال", "profile_title": "الملف الشخصي", "chg_pic": "تغيير الصورة", "chg_name": "تغيير الاسم", "history": "السجل"}}
-        }
-        self.blocked = {
-            "en": ["racism", "hate", "violence", "discrimination", "homophobia"],
-            "tr": ["ırkçılık", "nefret", "şiddet", "ayrımcılık", "homofobi"],
-            "fr": ["racisme", "haine", "violence", "discrimination", "homophobie"],
-            "de": ["rassismus", "hass", "gewalt", "diskriminierung", "homophobie"],
-            "ar": ["العنصرية", "كراهية", "عنف", "تمييز", "رهاب المثلية"]
         }
         self.cur_lang = self.user['default_language'] if self.user['default_language'] in self.langs else "English"
         self.current_url = ""
@@ -42,7 +44,7 @@ class MainApp(QMainWindow):
         self.content_layout = QVBoxLayout(self.content_widget)
         self.content_layout.setContentsMargins(20,20,20,20)
         self.content_layout.setSpacing(15)
-        self.title_lbl = QLabel("EduCollector 1.2")
+        self.title_lbl = QLabel(f"EduCollector {VERSION}")
         self.title_lbl.setFont(QFont("Segoe UI",24,QFont.Bold))
         self.title_lbl.setAlignment(Qt.AlignCenter)
         self.content_layout.addWidget(self.title_lbl)
@@ -104,8 +106,14 @@ class MainApp(QMainWindow):
         ab = QAction("About EduCollector", self)
         ab.triggered.connect(self.about)
         help_menu.addAction(ab)
+        help_menu.addSeparator()
+        el = QAction("EduCollector License", self)
+        el.triggered.connect(show_educollector_license)
+        help_menu.addAction(el)
+        pl = QAction("PySide6 License", self)
+        pl.triggered.connect(show_pyside6_license)
+        help_menu.addAction(pl)
     def mk_profile_box(self):
-        from PyQt5.QtWidgets import QGroupBox
         gb = QGroupBox(self.langs[self.cur_lang]["labels"]["profile_title"])
         gb.setFont(QFont("Segoe UI",10,QFont.Bold))
         layout = QVBoxLayout()
@@ -232,10 +240,6 @@ class MainApp(QMainWindow):
             QMessageBox.warning(self, "Warning", "Please enter a topic to search!")
             return
         lc = self.langs[self.cur_lang]["code"]
-        for k in self.blocked.get(lc, []):
-            if k.lower() in t.lower():
-                QMessageBox.warning(self, "Blocked", "This topic contains prohibited keywords.")
-                return
         record_search(self.db, t, lc)
         w = self.langs[self.cur_lang]["wiki_url"]
         url = w + t.replace(" ", "_")

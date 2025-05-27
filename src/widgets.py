@@ -1,21 +1,42 @@
 import sys, time
-from PyQt5.QtWidgets import QTextEdit, QPushButton
-from PyQt5.QtGui import QFont, QTextCursor
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QPropertyAnimation, QRect
+from PySide6.QtWidgets import QTextEdit, QPushButton
+from PySide6.QtGui import QFont, QTextCursor
+from PySide6.QtCore import Qt, QThread, Signal, QPropertyAnimation, QRect
 
 class ZoomTxt(QTextEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptRichText(True)
+        self.setFont(QFont("Segoe UI", 10))  # Başlangıç font boyutu
+        
     def wheelEvent(self, e):
         if e.modifiers() & Qt.ControlModifier:
+            font = self.font()
+            size = font.pointSize()
+            
             if e.angleDelta().y() > 0:
-                self.zoomIn(1)
+                # Yukarı scroll - büyüt
+                font.setPointSize(size + 1)
             else:
-                self.zoomOut(1)
+                # Aşağı scroll - küçült
+                if size > 1:  # Minimum 1 punto
+                    font.setPointSize(size - 1)
+                    
+            self.setFont(font)
             e.accept()
         else:
             super().wheelEvent(e)
+            
+    def focusInEvent(self, e):
+        super().focusInEvent(e)
+        self.setStyleSheet("QTextEdit:focus { border: 1px solid #0d47a1; }")
+        
+    def focusOutEvent(self, e):
+        super().focusOutEvent(e)
+        self.setStyleSheet("")
 
 class TxtEff(QThread):
-    update_text = pyqtSignal(str)
+    update_text = Signal(str)
     def __init__(self, txt, parent=None):
         super().__init__(parent)
         self.txt = txt
